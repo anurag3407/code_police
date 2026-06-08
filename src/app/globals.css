@@ -361,7 +361,7 @@ h1, h2, h3, h4, h5, h6 {
    ========================================================================== */
 
 :root {
-  /* Terminal palette */
+  /* Terminal palette - Dark Mode */
   --term-bg: #0b0e0f;
   --term-bg-soft: #11161a;
   --term-panel: #0f1418;
@@ -375,6 +375,23 @@ h1, h2, h3, h4, h5, h6 {
   --term-cyan: #39c5cf;
   --term-magenta: #bc8cff;
   --term-prompt: #58a6ff;
+}
+
+.light {
+  /* Terminal palette - Light Mode */
+  --term-bg: #f8fafc;
+  --term-bg-soft: #f1f5f9;
+  --term-panel: #e2e8f0;
+  --term-border: #cbd5e1;
+  --term-fg: #1e293b;
+  --term-fg-dim: #64748b;
+  --term-green: #22c55e;
+  --term-green-bright: #16a34a;
+  --term-amber: #f59e0b;
+  --term-red: #ef4444;
+  --term-cyan: #06b6d4;
+  --term-magenta: #8b5cf6;
+  --term-prompt: #3b82f6;
 }
 
 /* The terminal scope: apply to any container to opt into the aesthetic. */

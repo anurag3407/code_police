@@ -8,7 +8,7 @@ import { checkLimit, incrementUsage } from "@/lib/usage";
  * GET /api/code-police/projects
  * List all projects for the authenticated user with their latest analysis runs
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { userId } = await auth();
 
@@ -27,7 +27,7 @@ export async function GET() {
       .orderBy("createdAt", "desc")
       .get();
 
-    const projects = projectsSnapshot.docs.map((doc) => {
+    let projects = projectsSnapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -39,6 +39,16 @@ export async function GET() {
         createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
       };
     });
+
+    const searchQuery = request.nextUrl.searchParams.get("search");
+    if (searchQuery) {
+      const lowerCaseSearchQuery = searchQuery.toLowerCase();
+      projects = projects.filter(
+        (project) =>
+          project.name.toLowerCase().includes(lowerCaseSearchQuery) ||
+          project.githubFullName.toLowerCase().includes(lowerCaseSearchQuery)
+      );
+    }
 
     // Fetch latest analysis run for each project
     const projectsWithRuns = await Promise.all(

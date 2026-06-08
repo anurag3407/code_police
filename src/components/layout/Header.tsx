@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useAuth, UserButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
+import { DarkModeToggle } from '@/components/ui/DarkModeToggle';
 
 interface NavItem {
   label: string;
@@ -73,6 +74,7 @@ export default function Header() {
 
         {/* Auth Buttons / User Menu */}
         <div className="hidden md:flex items-center gap-3">
+          <DarkModeToggle />
           {isLoaded && isSignedIn ? (
             // Show user button and dashboard link for authenticated users
             <>

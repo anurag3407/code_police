@@ -80,8 +80,8 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" suppressHydrationWarning className="dark" data-scroll-behavior="smooth">
-        <body className={`${inter.variable} ${spaceGrotesk.variable} ${syne.variable} ${jetbrainsMono.variable} font-sans antialiased bg-black text-white`}>
+      <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+        <body className={`${inter.variable} ${spaceGrotesk.variable} ${syne.variable} ${jetbrainsMono.variable} font-sans antialiased bg-neutral-950 text-white dark:bg-neutral-950 dark:text-white light:bg-white light:text-black`}>
           <Providers>
             {children}
           </Providers>
@@ -95,4 +95,3 @@ export default function RootLayout({
     </ClerkProvider>
   );
 }
-

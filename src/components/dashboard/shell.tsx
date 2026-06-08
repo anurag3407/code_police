@@ -21,6 +21,7 @@ import {
 } from "@tabler/icons-react";
 import { FloatingDock, DockItem } from "@/components/ui/floating-dock";
 import { BackgroundRippleEffect } from "@/components/ui/background-ripple-effect";
+import { DarkModeToggle } from "@/components/ui/DarkModeToggle";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -71,7 +72,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
   ];
 
   return (
-    <div className="relative min-h-screen bg-neutral-950 overflow-hidden">
+    <div className="relative min-h-screen bg-neutral-950 dark:bg-neutral-950 light:bg-white overflow-hidden">
       {/* Background Effects Layer */}
       <div className="fixed inset-0 z-0">
         {/* Ripple Grid Background */}
@@ -83,7 +84,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         {/* Gradient accent line */}
         <div className="h-0.5 bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
 
-        <div className="h-14 flex items-center justify-between px-6 bg-neutral-950/90 backdrop-blur-xl border-b border-white/5">
+        <div className="h-14 flex items-center justify-between px-6 bg-neutral-950/90 dark:bg-neutral-950/90 light:bg-white/90 backdrop-blur-xl border-b border-white/5 dark:border-white/5 light:border-black/5">
           <a href="/dashboard" className="flex items-center gap-2.5 group">
             <Image
               src="/zero3.png"
@@ -100,6 +101,9 @@ export function DashboardShell({ children }: DashboardShellProps) {
           </a>
 
           <div className="flex items-center gap-3">
+            {/* Theme Toggle */}
+            <DarkModeToggle />
+
             {/* Notifications Link */}
             <Link
               href="/dashboard/notifications"
