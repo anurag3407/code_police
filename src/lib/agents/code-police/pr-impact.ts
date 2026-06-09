@@ -28,6 +28,11 @@ import {
   formatConflictComment,
   type ConflictReport,
 } from "./conflict-detector";
+import {
+  analyzeBreakingChanges,
+  formatBreakingChangesComment,
+  type BreakingChangeReport,
+} from "./breaking-changes";
 import { fetchRepoTree, fetchFileContent } from "./github";
 
 const MAX_TREE_FILES = 400; // cap to stay within API/time budgets
@@ -38,6 +43,8 @@ export interface PrImpactResult {
   conflicts: ConflictReport | null;
   /** Circular import chains detected in the graph (each `[a, b, c]` = a→b→c→a). */
   cycles: string[][];
+  /** Breaking changes to the public API surface (null if analysis failed). */
+  breakingChanges: BreakingChangeReport | null;
   /** Combined Markdown comment ready to post on the PR. */
   comment: string;
 }
@@ -107,15 +114,33 @@ export async function analyzePrImpact(opts: {
     }
   }
 
+  // 5. Breaking-change detection: compare base vs head signatures of the
+  //    changed files. Bounded to the changed-file set, so it stays cheap.
+  let breakingChanges: BreakingChangeReport | null = null;
+  try {
+    breakingChanges = await analyzeBreakingChanges({
+      githubToken,
+      owner,
+      repo,
+      baseBranch,
+      branch,
+      changedFiles,
+    });
+  } catch (err) {
+    console.warn("[PR Impact] Breaking-change detection failed:", err);
+  }
+
   const cyclesComment = formatCyclesComment(relevantCycles);
+  const breakingComment = breakingChanges ? formatBreakingChangesComment(breakingChanges) : "";
 
   const comment = [
     formatImpactComment(impact),
     cyclesComment ? "\n\n" + cyclesComment : "",
+    breakingComment ? "\n\n" + breakingComment : "",
     conflicts ? "\n\n" + formatConflictComment(conflicts) : "",
   ].join("");
 
-  return { impact, conflicts, cycles: allCycles, comment };
+  return { impact, conflicts, cycles: allCycles, breakingChanges, comment };
 }
 
 async function fetchFilesBatched(
