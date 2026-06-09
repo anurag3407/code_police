@@ -149,18 +149,19 @@ function splitPatch(patch?: string): DiffLines {
 
 /**
  * Regexes recognising a *named top-level declaration* in a single line of
- * JS/TS or Python source, capturing the identifier in group 1. Deliberately
- * limited to forms that introduce a referenceable top-level symbol.
+ * JS/TS or Python source, capturing the identifier in group 1. Anchored to
+ * the start of the line (`^`) so local declarations inside function or class
+ * bodies (which are indented) are not mistaken for top-level removals.
  */
 const DECLARATION_RES: RegExp[] = [
   // function NAME / async function NAME / function* NAME / export [default] ...
-  /\b(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
+  /^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
   // class NAME / export [default] [abstract] class NAME  (also matches Python `class NAME`)
-  /\b(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/,
+  /^(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/,
   // const/let/var NAME  (optionally exported)
-  /\b(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/,
+  /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/,
   // Python: def NAME( / async def NAME(
-  /\b(?:async\s+)?def\s+([A-Za-z_$][\w$]*)\s*\(/,
+  /^(?:async\s+)?def\s+([A-Za-z_$][\w$]*)\s*\(/,
 ];
 
 /** Extract the names of top-level symbols declared on a single source line. */
@@ -190,14 +191,23 @@ export function collectRemovedBaseSymbols(
   baseFiles: Array<{ filename: string; patch?: string }>
 ): Map<string, string> {
   const removed = new Map<string, string>();
+
+  // First pass: collect every symbol declared anywhere in base additions so a
+  // symbol moved/renamed across files on base is not mistaken for a removal.
+  const globalAddedDecls = new Set<string>();
   for (const file of baseFiles) {
-    const { added, removed: removedLines } = splitPatch(file.patch);
-    const addedDecls = new Set<string>();
-    for (const line of added) for (const s of declaredSymbolsInLine(line)) addedDecls.add(s);
+    const { added } = splitPatch(file.patch);
+    for (const line of added) for (const s of declaredSymbolsInLine(line)) globalAddedDecls.add(s);
+  }
+
+  // Second pass: a removed symbol is only flagged when it does not re-appear
+  // anywhere in the base diff (not just in the same file).
+  for (const file of baseFiles) {
+    const { removed: removedLines } = splitPatch(file.patch);
     for (const line of removedLines) {
       for (const s of declaredSymbolsInLine(line)) {
         if (s.length < 3) continue;
-        if (addedDecls.has(s)) continue; // reformatted/kept on base, not removed
+        if (globalAddedDecls.has(s)) continue; // symbol still exists somewhere on base
         if (!removed.has(s)) removed.set(s, file.filename);
       }
     }
@@ -217,6 +227,7 @@ function collectPrDeclaredSymbols(prFiles: Array<{ filename: string; patch?: str
 
 /** True when `line` itself declares/defines `symbol` (so it's not a reference). */
 function lineDeclaresSymbol(line: string, symbol: string): boolean {
+  if (line.length > 1000) return false;
   if (declaredSymbolsInLine(line).includes(symbol)) return true;
   const esc = escapeRe(symbol);
   // Method or arrow-property definition: `name(...) {` or `name = (...) =>`.
@@ -226,23 +237,36 @@ function lineDeclaresSymbol(line: string, symbol: string): boolean {
 }
 
 /**
- * True when `line` references `symbol` as a call, construction, or import —
- * the high-confidence signals that the PR actually uses the symbol (rather
- * than a coincidental word match). Comment lines are ignored.
+ * True when `line` references `symbol` as a call, construction, or named
+ * import/export binding — the high-confidence signals that the PR actually
+ * uses the symbol. Comment lines and overly long lines are ignored.
+ *
+ * Import/export detection is narrowed to actual value bindings (named imports
+ * in `{ }`, default import names, require destructuring) to avoid false
+ * positives from type-only exports or module-path strings that happen to
+ * contain the symbol name.
  */
 function lineReferencesSymbol(line: string, symbol: string): boolean {
+  if (line.length > 1000) return false;
   if (COMMENT_LINE.test(line)) return false;
   const esc = escapeRe(symbol);
   if (!new RegExp(`\\b${esc}\\b`).test(line)) return false;
-  // import / export-from / require naming the symbol.
+
+  // Named import/export binding: import { NAME } / export { NAME }
+  // Matches the symbol appearing after `{` or `,` in a binding list.
   if (
-    /^\s*import\b/.test(line) ||
-    /^\s*export\b/.test(line) ||
-    /\brequire\s*\(/.test(line) ||
-    /^\s*from\s+\S+\s+import\b/.test(line)
+    /^\s*(?:import|export)\b/.test(line) &&
+    new RegExp(`[{,]\\s*${esc}\\b`).test(line)
   ) {
     return true;
   }
+  // Default import: import NAME from '...'
+  if (new RegExp(`^\\s*import\\s+${esc}\\s+from\\b`).test(line)) return true;
+  // require binding: const NAME = require(...) or const { NAME } = require(...)
+  if (/\brequire\s*\(/.test(line)) return true;
+  // Python: from x import NAME
+  if (/^\s*from\s+\S+\s+import\b/.test(line)) return true;
+
   // Construction or call.
   if (new RegExp(`\\bnew\\s+${esc}\\b`).test(line)) return true;
   if (new RegExp(`\\b${esc}\\s*\\(`).test(line)) return true;
