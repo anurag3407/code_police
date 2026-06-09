@@ -125,6 +125,7 @@ export async function analyzePrImpact(opts: {
       baseBranch,
       branch,
       changedFiles,
+      prNumber,
     });
   } catch (err) {
     console.warn("[PR Impact] Breaking-change detection failed:", err);

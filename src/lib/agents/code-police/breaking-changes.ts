@@ -387,7 +387,10 @@ function extractTopLevelFunctions(source: string): FunctionSig[] {
   const re = /\bexport\s+(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)?\s*(?:<[^=<>]*>)?\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source)) !== null) {
-    const name = m[1] ?? "default";
+    // `export default function foo()` is always keyed "default" — consumers import
+    // it as the default export regardless of the internal function name. Renaming
+    // the internal name only is not a breaking change.
+    const name = /\bdefault\b/.test(m[0]) ? "default" : (m[1] ?? "default");
     const openIdx = source.indexOf("(", m.index + m[0].length - 1);
     if (openIdx === -1) continue;
     const close = matchParen(source, openIdx);
@@ -409,21 +412,20 @@ function extractExportedVariableFunctions(source: string): FunctionSig[] {
     let i = m.index + m[0].length;
     while (i < source.length && /\s/.test(source[i])) i++;
 
-    // `= function [name] <...> (`
-    const fnMatch = /^function\s*\*?\s*[A-Za-z_$][\w$]*?\s*(?:<[^=<>]*>)?\s*\(/.exec(source.slice(i));
-    if (source.slice(i).startsWith("function")) {
-      const openIdx = source.indexOf("(", i);
-      if (openIdx !== -1) {
-        const close = matchParen(source, openIdx);
-        if (close !== -1) {
-          const params = parseParamList(source.slice(openIdx + 1, close));
-          const { type } = readReturnType(source, close + 1);
-          out.push({ name, params, returnType: type, kind: "arrow" });
-          continue;
-        }
+    // `= function [name] <...> (`  — use the fnMatch result to locate the `(`
+    // precisely rather than re-scanning with indexOf (which could land on a `(`
+    // inside a generic parameter list or a default value in a prior argument).
+    const fnMatch = /^function\s*\*?\s*(?:[A-Za-z_$][\w$]*)?\s*(?:<[^=<>]*>)?\s*\(/.exec(source.slice(i));
+    if (fnMatch) {
+      const openIdx = i + fnMatch[0].length - 1; // fnMatch[0] ends with "("
+      const close = matchParen(source, openIdx);
+      if (close !== -1) {
+        const params = parseParamList(source.slice(openIdx + 1, close));
+        const { type } = readReturnType(source, close + 1);
+        out.push({ name, params, returnType: type, kind: "arrow" });
+        continue;
       }
     }
-    void fnMatch;
 
     // Skip an optional generic param list `<...>` before an arrow.
     if (source[i] === "<") {
@@ -776,13 +778,42 @@ function normalizeType(t: string): string {
 
 const MAX_CHANGED_FILES = 60; // bound API usage
 
+/** Lightweight helper: fetch a GitHub API endpoint as JSON with Bearer auth. */
+async function ghApiJson<T>(token: string, url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+const GITHUB_API_BASE_BC = "https://api.github.com";
+
+interface AnalysisTarget {
+  path: string;
+  /** True when the PR deletes this file — head is intentionally absent. */
+  isDeleted: boolean;
+}
+
 /**
- * Analyze the breaking-change impact of a PR by comparing base vs head
- * signatures for each changed JS/TS file. Self-contained: it fetches the two
- * versions of each file itself, mirroring the conflict detector. Files that
- * are absent on one side (added or deleted by the PR) are handled gracefully —
- * a brand-new file has no base signatures (no breaking changes), a deleted
- * file has no head signatures (all its exports count as removed).
+ * Analyse breaking changes introduced by a PR.
+ *
+ * Accepts the caller-supplied `changedFiles` (added/modified paths) and, when
+ * `prNumber` is provided, also fetches the full PR file list so **deleted**
+ * files are included — their removed exports are the highest-impact breaking
+ * case and were previously missed because callers strip `status:"removed"`
+ * entries before building `changedFiles`.
+ *
+ * Fetch-error handling:
+ * - Base 404 (new file): treated as empty — no prior API surface to break.
+ * - Head failure on a **non-deleted** file (transient error / rate-limit):
+ *   the file is **skipped** rather than diffed against an empty string, which
+ *   would generate false "all exports removed" reports.
+ * - Deleted files: head is empty by design; only base is fetched.
  */
 export async function analyzeBreakingChanges(opts: {
   githubToken: string;
@@ -791,19 +822,54 @@ export async function analyzeBreakingChanges(opts: {
   baseBranch: string;
   branch: string;
   changedFiles: string[];
+  /** When supplied, the PR file list is fetched to recover deleted files. */
+  prNumber?: number;
 }): Promise<BreakingChangeReport> {
-  const { githubToken, owner, repo, baseBranch, branch } = opts;
-  const targets = opts.changedFiles.filter(isJsTsSource).slice(0, MAX_CHANGED_FILES);
+  const { githubToken, owner, repo, baseBranch, branch, prNumber } = opts;
+
+  // Start with caller-supplied added/modified files.
+  const targets: AnalysisTarget[] = opts.changedFiles
+    .filter(isJsTsSource)
+    .map((path) => ({ path, isDeleted: false }));
+
+  // Recover deleted files that upstream callers strip before passing changedFiles.
+  if (prNumber) {
+    const prFiles = await ghApiJson<Array<{ filename: string; status: string }>>(
+      githubToken,
+      `${GITHUB_API_BASE_BC}/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`
+    );
+    if (prFiles) {
+      const already = new Set(targets.map((t) => t.path));
+      for (const f of prFiles) {
+        if (f.status === "removed" && isJsTsSource(f.filename) && !already.has(f.filename)) {
+          targets.push({ path: f.filename, isDeleted: true });
+        }
+      }
+    }
+  }
 
   const files: FileBreakingChanges[] = [];
 
-  for (const path of targets) {
-    const [baseContent, headContent] = await Promise.all([
-      fetchFileContent(githubToken, owner, repo, path, baseBranch).catch(() => ""),
-      fetchFileContent(githubToken, owner, repo, path, branch).catch(() => ""),
-    ]);
+  for (const { path, isDeleted } of targets.slice(0, MAX_CHANGED_FILES)) {
+    // Base: 404 = brand-new file (no prior API) → treat as empty.
+    const baseContent = await fetchFileContent(githubToken, owner, repo, path, baseBranch).catch(
+      () => ""
+    );
 
-    // Nothing to compare (e.g. both fetches failed) — skip silently.
+    let headContent: string;
+    if (isDeleted) {
+      // Deleted file: head is absent by design.
+      headContent = "";
+    } else {
+      // Modified/added: a fetch failure is a transient error, not "file has
+      // no exports". Skip the file to avoid false removed-export reports.
+      const headResult = await fetchFileContent(githubToken, owner, repo, path, branch).catch(
+        () => null
+      );
+      if (headResult === null) continue;
+      headContent = headResult;
+    }
+
     if (!baseContent && !headContent) continue;
 
     const baseSigs = baseContent ? extractSignatures(baseContent) : [];
