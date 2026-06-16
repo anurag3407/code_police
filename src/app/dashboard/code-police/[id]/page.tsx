@@ -29,6 +29,7 @@ import {
 
 import { ProjectSettings } from "@/components/code-police/ProjectSettings";
 import { DependencyImpact, type ImpactData } from "@/components/code-police/DependencyImpact";
+import { toast } from "sonner";
 
 /**
  * ============================================================================
@@ -280,70 +281,89 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const runAnalysis = async () => {
     if (!project) return;
     setIsAnalyzing(true);
-    try {
-      // Get owner and repo - try individual fields first, then parse from fullName
-      let owner = project.githubOwner;
-      let repo = project.githubRepoName;
 
-      if (!owner || !repo) {
-        // Fallback to parsing githubFullName
-        const parts = project.githubFullName?.split('/');
-        if (parts && parts.length === 2) {
-          owner = parts[0];
-          repo = parts[1];
+    const analysisPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Get owner and repo - try individual fields first, then parse from fullName
+        let owner = project.githubOwner;
+        let repo = project.githubRepoName;
+
+        if (!owner || !repo) {
+          // Fallback to parsing githubFullName
+          const parts = project.githubFullName?.split('/');
+          if (parts && parts.length === 2) {
+            owner = parts[0];
+            repo = parts[1];
+          }
         }
+
+        console.log('[Code Police] Running analysis with:', { projectId: project.id, owner, repo });
+
+        if (!owner || !repo) {
+          throw new Error('Repository information not found. Please reconnect the repository.');
+        }
+
+        const res = await fetch('/api/code-police/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            owner,
+            repo,
+            sendEmail: true,
+          }),
+        });
+
+        const data = await res.json();
+        console.log('[Code Police] Analysis response:', data);
+
+        if (!res.ok) {
+          throw new Error(data.error || data.details || 'Analysis failed');
+        }
+
+        // Refresh data to show new run
+        await fetchData(true);
+        resolve(data);
+      } catch (err) {
+        console.error('[Code Police] Analysis error:', err);
+        reject(err);
+      } finally {
+        setIsAnalyzing(false);
       }
+    });
 
-      console.log('[Code Police] Running analysis with:', { projectId: project.id, owner, repo });
-
-      if (!owner || !repo) {
-        throw new Error('Repository information not found. Please reconnect the repository.');
-      }
-
-      const res = await fetch('/api/code-police/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: project.id,
-          owner,
-          repo,
-          sendEmail: true,
-        }),
-      });
-
-      const data = await res.json();
-      console.log('[Code Police] Analysis response:', data);
-
-      if (!res.ok) {
-        throw new Error(data.error || data.details || 'Analysis failed');
-      }
-
-      // Refresh data to show new run
-      await fetchData(true);
-      alert(`Analysis complete! Found ${data.issueCount} issues.`);
-    } catch (err) {
-      console.error('[Code Police] Analysis error:', err);
-      alert(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
-      setIsAnalyzing(false);
-    }
+    toast.promise(analysisPromise, {
+      loading: "Running code analysis...",
+      success: (data: any) => `Analysis complete! Found ${data.issueCount} issues.`,
+      error: (err) => err instanceof Error ? err.message : 'Analysis failed',
+    });
   };
   // Simulate a PR Webhook
   const simulatePR = async () => {
     if (!project) return;
     setIsSimulating(true);
-    try {
-      const res = await fetch(`/api/code-police/projects/${project.id}/demo-pr`, {
-        method: 'POST',
-      });
-      if (!res.ok) throw new Error("Failed to simulate PR");
-      await fetchData(true);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to simulate PR webhook");
-    } finally {
-      setIsSimulating(false);
-    }
+
+    const simulatePromise = new Promise(async (resolve, reject) => {
+      try {
+        const res = await fetch(`/api/code-police/projects/${project.id}/demo-pr`, {
+          method: 'POST',
+        });
+        if (!res.ok) throw new Error("Failed to simulate PR");
+        await fetchData(true);
+        resolve(true);
+      } catch (err) {
+        console.error(err);
+        reject(err);
+      } finally {
+        setIsSimulating(false);
+      }
+    });
+
+    toast.promise(simulatePromise, {
+      loading: "Simulating Pull Request webhook...",
+      success: "Demo PR simulated successfully!",
+      error: "Failed to simulate PR webhook",
+    });
   };
   // Fetch issues for a specific run
   const fetchIssuesForRun = async (runId: string) => {
@@ -369,53 +389,60 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!project) return;
 
     setIsCreatingPR(runId);
-    try {
-      const res = await fetch('/api/code-police/issues', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: project.id, runId }),
-      });
+    const createPrPromise = new Promise(async (resolve, reject) => {
+      try {
+        const res = await fetch('/api/code-police/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: project.id, runId }),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (res.ok && data.success) {
-        alert(`PR created successfully! View it at: ${data.prUrl}`);
-        window.open(data.prUrl, '_blank');
-        await fetchData(true);
-      } else if (data.message) {
-        // Handle detailed error response
-        let errorMessage = data.message;
+        if (res.ok && data.success) {
+          window.open(data.prUrl, '_blank');
+          await fetchData(true);
+          resolve(data);
+        } else if (data.message) {
+          // Handle detailed error response
+          let errorMessage = data.message;
 
-        // Add details about what was attempted
-        if (data.fixesGenerated !== undefined) {
-          errorMessage += `\n\nDetails:\n`;
-          errorMessage += `• Fixes generated: ${data.fixesGenerated}\n`;
-          if (data.autoApplicableCount !== undefined) {
-            errorMessage += `• Auto-applicable: ${data.autoApplicableCount}\n`;
+          // Add details about what was attempted
+          if (data.fixesGenerated !== undefined) {
+            errorMessage += `\n\nDetails:\n`;
+            errorMessage += `• Fixes generated: ${data.fixesGenerated}\n`;
+            if (data.autoApplicableCount !== undefined) {
+              errorMessage += `• Auto-applicable: ${data.autoApplicableCount}\n`;
+            }
+            if (data.lowConfidenceCount > 0) {
+              errorMessage += `• Low confidence (needs review): ${data.lowConfidenceCount}\n`;
+            }
+            if (data.requiresManualReview > 0) {
+              errorMessage += `• Requires manual review: ${data.requiresManualReview}\n`;
+            }
+            if (data.unfixableCount > 0) {
+              errorMessage += `• Unfixable issues: ${data.unfixableCount}\n`;
+            }
           }
-          if (data.lowConfidenceCount > 0) {
-            errorMessage += `• Low confidence (needs review): ${data.lowConfidenceCount}\n`;
-          }
-          if (data.requiresManualReview > 0) {
-            errorMessage += `• Requires manual review: ${data.requiresManualReview}\n`;
-          }
-          if (data.unfixableCount > 0) {
-            errorMessage += `• Unfixable issues: ${data.unfixableCount}\n`;
-          }
+
+          console.log('[Code Police] Fix PR response details:', data);
+          reject(new Error(errorMessage));
+        } else {
+          reject(new Error(data.error || 'Failed to create PR'));
         }
-
-        // Suggest checking the console for more details
-        console.log('[Code Police] Fix PR response details:', data);
-        alert(errorMessage + '\n\nCheck the browser console for more details.');
-      } else {
-        alert(data.error || 'Failed to create PR');
+      } catch (err) {
+        console.error('[Code Police] Fix PR error:', err);
+        reject(err);
+      } finally {
+        setIsCreatingPR(null);
       }
-    } catch (err) {
-      console.error('[Code Police] Fix PR error:', err);
-      alert(err instanceof Error ? err.message : 'Failed to create PR');
-    } finally {
-      setIsCreatingPR(null);
-    }
+    });
+
+    toast.promise(createPrPromise, {
+      loading: "Generating fixes and creating PR...",
+      success: (data: any) => `PR created successfully! PR #${data.prNumber || ''}`,
+      error: (err) => err instanceof Error ? err.message : 'Failed to create PR',
+    });
   };
 
   // Expand run and fetch issues

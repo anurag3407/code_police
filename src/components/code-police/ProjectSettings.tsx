@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Settings,
   Play,
@@ -16,6 +17,8 @@ import {
   Zap,
   KeyRound,
   Trash2,
+  Copy,
+  Check,
 } from "lucide-react";
 
 interface ProjectSettingsProps {
@@ -52,6 +55,18 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
   const [newKey, setNewKey] = useState("");
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyMsg, setKeyMsg] = useState("");
+  const [copiedType, setCopiedType] = useState<"id" | "key" | null>(null);
+
+  const handleCopyText = async (text: string, type: "id" | "key") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedType(type);
+      toast.success(`${type === "id" ? "Project ID" : "Gemini API key hint"} copied to clipboard!`);
+      setTimeout(() => setCopiedType(null), 2000);
+    } catch (err) {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
 
   const handleSaveKey = async () => {
     if (!newKey.trim()) return;
@@ -68,8 +83,11 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
       setKeyHint(data.keyHint);
       setNewKey("");
       setKeyMsg("Key saved and encrypted.");
+      toast.success("Gemini API key saved and encrypted successfully!");
     } catch (err) {
-      setKeyMsg(err instanceof Error ? err.message : "Failed to save key");
+      const errMsg = err instanceof Error ? err.message : "Failed to save key";
+      setKeyMsg(errMsg);
+      toast.error(errMsg);
     } finally {
       setKeyBusy(false);
     }
@@ -88,8 +106,11 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
       }
       setKeyHint(undefined);
       setKeyMsg("Key removed. Using platform default.");
+      toast.success("Gemini API key removed. Using platform default.");
     } catch (err) {
-      setKeyMsg(err instanceof Error ? err.message : "Failed to remove key");
+      const errMsg = err instanceof Error ? err.message : "Failed to remove key";
+      setKeyMsg(errMsg);
+      toast.error(errMsg);
     } finally {
       setKeyBusy(false);
     }
@@ -144,9 +165,12 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
           emailOnPush,
         },
       } as Partial<ProjectSettingsProps['project']>);
+      toast.success("Project settings updated successfully!");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      const errMsg = err instanceof Error ? err.message : "Failed to save settings";
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -173,6 +197,27 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
 
         {/* Content */}
         <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          {/* Project ID */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">
+              Project ID
+            </label>
+            <div className="flex items-center justify-between p-3 bg-zinc-800/50 border border-zinc-800 rounded-xl">
+              <span className="text-sm font-mono text-zinc-400 select-all">{project.id}</span>
+              <button
+                onClick={() => handleCopyText(project.id, "id")}
+                className="p-1.5 hover:bg-zinc-700 hover:text-white rounded-lg transition-all text-zinc-500 cursor-pointer"
+                title="Copy Project ID"
+              >
+                {copiedType === "id" ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
           {/* Status Toggle */}
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-3">
@@ -292,19 +337,32 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
             </p>
 
             {keyHint ? (
-              <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-zinc-800/50 border border-zinc-800 rounded-xl">
                 <div className="flex items-center gap-3">
                   <KeyRound className="w-4 h-4 text-emerald-400" />
                   <span className="text-sm font-mono text-zinc-300">{keyHint}</span>
                 </div>
-                <button
-                  onClick={handleRemoveKey}
-                  disabled={keyBusy}
-                  className="p-2 hover:bg-zinc-700 rounded transition-colors disabled:opacity-50"
-                  aria-label="Remove key"
-                >
-                  <Trash2 className="w-4 h-4 text-red-400" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleCopyText(keyHint, "key")}
+                    className="p-1.5 hover:bg-zinc-700 hover:text-white rounded-lg transition-all text-zinc-500 cursor-pointer"
+                    title="Copy Key Hint"
+                  >
+                    {copiedType === "key" ? (
+                      <Check className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={handleRemoveKey}
+                    disabled={keyBusy}
+                    className="p-1.5 hover:bg-zinc-700 rounded transition-colors disabled:opacity-50 cursor-pointer"
+                    aria-label="Remove key"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex gap-2">

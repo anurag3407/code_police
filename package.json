@@ -11,7 +11,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
-    "validate-env": "node scripts/validate-env.js"
+    "validate-env": "node scripts/validate-env.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.5",
@@ -55,7 +57,6 @@
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.5",
     "@types/pg": "^8.16.0",
-    "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/uuid": "^10.0.0",
@@ -107,9 +108,16 @@
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.5",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.17",
     "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "hardhat": "^2.28.2"
+    "hardhat": "^2.28.2",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.9"
   }
 }

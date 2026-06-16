@@ -1,0 +1,118 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StatusBadge Component > renders correctly for status: cloning 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-400/20 text-blue-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"
+    />
+    Cloning
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: completed 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-400/20 text-emerald-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current "
+    />
+    Completed
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: failed 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-400/20 text-red-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current "
+    />
+    Failed
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: fixing 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-400/20 text-orange-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"
+    />
+    Fixing
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: partial_success 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-400/20 text-amber-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current "
+    />
+    Partial Fix
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: pushing 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-400/20 text-cyan-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"
+    />
+    Pushing
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: queued 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-400/20 text-zinc-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current "
+    />
+    Queued
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: scanning 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-400/20 text-yellow-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"
+    />
+    Scanning
+  </span>
+</DocumentFragment>
+`;
+
+exports[`StatusBadge Component > renders correctly for status: testing 1`] = `
+<DocumentFragment>
+  <span
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-400/20 text-violet-400"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"
+    />
+    Testing
+  </span>
+</DocumentFragment>
+`;
