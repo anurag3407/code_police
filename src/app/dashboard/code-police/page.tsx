@@ -19,6 +19,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { GhostfounderLoader } from "@/components/ui/ghostfounder-loader";
+import { toast } from "sonner";
 
 /**
  * ============================================================================
@@ -65,6 +66,17 @@ export default function CodePolicePage() {
 
     fetchProjects(1);
   }, [userId, router, searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("connected") === "true") {
+        toast.success("Repository connected successfully!");
+        const newUrl = window.location.pathname;
+        window.history.replaceState({ path: newUrl }, "", newUrl);
+      }
+    }
+  }, []);
 
   const fetchProjects = async (page = 1) => {
     setLoading(true);
@@ -264,28 +276,38 @@ function ProjectCard({
     }
 
     setIsDisconnecting(true);
-    try {
-      const response = await fetch('/api/code-police/disconnect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: project.id,
-          deleteAnalysisRuns: true,
-        }),
-      });
+    const disconnectPromise = new Promise(async (resolve, reject) => {
+      try {
+        const response = await fetch('/api/code-police/disconnect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            deleteAnalysisRuns: true,
+          }),
+        });
 
-      if (response.ok) {
-        onDisconnect();
-      } else {
-        alert('Failed to disconnect repository');
+        if (response.ok) {
+          onDisconnect();
+          resolve(true);
+        } else {
+          const data = await response.json();
+          reject(new Error(data.error || 'Failed to disconnect repository'));
+        }
+      } catch (error) {
+        console.error('Error disconnecting:', error);
+        reject(error);
+      } finally {
+        setIsDisconnecting(false);
+        setShowConfirm(false);
       }
-    } catch (error) {
-      console.error('Error disconnecting:', error);
-      alert('Failed to disconnect repository');
-    } finally {
-      setIsDisconnecting(false);
-      setShowConfirm(false);
-    }
+    });
+
+    toast.promise(disconnectPromise, {
+      loading: "Disconnecting repository...",
+      success: "Repository disconnected successfully!",
+      error: (err) => err instanceof Error ? err.message : "Failed to disconnect repository",
+    });
   };
 
   const getStatusIcon = (status: string) => {
