@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Settings,
   Play,
@@ -68,8 +69,11 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
       setKeyHint(data.keyHint);
       setNewKey("");
       setKeyMsg("Key saved and encrypted.");
+      toast.success("Gemini API key saved and encrypted successfully!");
     } catch (err) {
-      setKeyMsg(err instanceof Error ? err.message : "Failed to save key");
+      const errMsg = err instanceof Error ? err.message : "Failed to save key";
+      setKeyMsg(errMsg);
+      toast.error(errMsg);
     } finally {
       setKeyBusy(false);
     }
@@ -88,8 +92,11 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
       }
       setKeyHint(undefined);
       setKeyMsg("Key removed. Using platform default.");
+      toast.success("Gemini API key removed. Using platform default.");
     } catch (err) {
-      setKeyMsg(err instanceof Error ? err.message : "Failed to remove key");
+      const errMsg = err instanceof Error ? err.message : "Failed to remove key";
+      setKeyMsg(errMsg);
+      toast.error(errMsg);
     } finally {
       setKeyBusy(false);
     }
@@ -144,9 +151,12 @@ export function ProjectSettings({ project, onUpdate, onClose }: ProjectSettingsP
           emailOnPush,
         },
       } as Partial<ProjectSettingsProps['project']>);
+      toast.success("Project settings updated successfully!");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      const errMsg = err instanceof Error ? err.message : "Failed to save settings";
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
