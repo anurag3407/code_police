@@ -17,3 +17,11 @@ variables:
   SECRET_DETECTION_ENABLED: 'true'
 secret_detection:
   stage: secret-detection
+
+
+deploy_staging:
+  stage: deploy
+  script:
+    - echo 'Deploying to staging environment'
+  environment:
+    name: staging
