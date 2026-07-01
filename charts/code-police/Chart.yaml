@@ -1,0 +1,4 @@
+apiVersion: v2
+name: code-police
+description: A Helm chart for Code-Police
+version: 0.1.0
