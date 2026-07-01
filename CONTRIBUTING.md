@@ -67,3 +67,7 @@ Never commit secrets. BYOK keys are encrypted with `BYOK_ENCRYPTION_KEY`; if you
 touch `byok.ts`, ensure raw keys are never logged or returned to the client.
 
 Happy hacking! `▋`
+
+
+## Good First Issues
+Check the issue tracker for the `good first issue` label. These are typically small bug fixes, documentation improvements, or minor feature enhancements perfectly scoped for new contributors.
