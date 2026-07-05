@@ -112,3 +112,11 @@ the community. Read [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 ## License
 
 [MIT](LICENSE) © Code-Police contributors.
+
+
+## Supported Languages
+| Language | Support Level |
+| --- | --- |
+| TypeScript/JavaScript | Full |
+| Python | Experimental |
+| Go | Planned |
